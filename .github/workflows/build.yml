@@ -17,6 +17,10 @@ jobs:
             mingw-w64-x86_64-binutils
             mingw-w64-i686-binutils
 
+      - name: Install i686 tools
+        shell: msys2 {0}
+        run: pacman -S --noconfirm mingw-w64-i686-binutils mingw-w64-i686-gcc
+
       - name: Build
         shell: msys2 {0}
         run: |
