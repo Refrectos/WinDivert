@@ -1,0 +1,20 @@
+name: Build WinDivert
+on: [push]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install MinGW
+        run: choco install mingw -y
+      - name: Build
+        shell: bash
+        run: bash mingw-build.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: windivert-build
+          path: |
+            output/**/*.exe
+            output/**/*.dll
+            output/**/*.sys
