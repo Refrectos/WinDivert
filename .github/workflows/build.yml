@@ -21,8 +21,34 @@ jobs:
         shell: msys2 {0}
         run: |
           export PATH="/mingw32/bin:/mingw64/bin:$PATH"
-          awk '{gsub(/CLIBS="-lkernel32 -ladvapi32 \$EXTRA_OPTS"/, "CLIBS=\"-lkernel32 -ladvapi32 -lmsvcrt \$EXTRA_OPTS\"")}1' mingw-build.sh > mingw-build-patched.sh
-          bash mingw-build-patched.sh
+          ENVS="i686-w64-mingw32 x86_64-w64-mingw32"
+          for ENV in $ENVS
+          do
+            if [ $ENV = "i686-w64-mingw32" ]; then CPU=i386; BITS=32; MANGLE=_
+            else CPU=amd64; BITS=64; MANGLE=; fi
+            echo "BUILD MINGW-$CPU"
+            CC="$ENV-gcc"
+            STRIP="$ENV-strip"
+            DLLTOOL="$ENV-dlltool"
+            COPTS="-fno-ident -shared -Wall -Wno-pointer-to-int-cast -Os -Iinclude/ -Wl,--enable-stdcall-fixup -Wl,--entry=${MANGLE}WinDivertDllEntry"
+            CLIBS="-lkernel32 -ladvapi32 -lmsvcrt"
+            if [ -x "$(which $CC)" ]; then
+              mkdir -p "install/MINGW/$CPU"
+              $CC $COPTS -c dll/windivert.c -o dll/windivert.o
+              $CC $COPTS -o "install/MINGW/$CPU/WinDivert.dll" dll/windivert.o dll/windivert.def -nostdlib $CLIBS
+              $STRIP "install/MINGW/$CPU/WinDivert.dll"
+              $DLLTOOL --dllname install/MINGW/$CPU/WinDivert.dll --def dll/windivert.def --output-lib install/MINGW/$CPU/WinDivert.lib 2>/dev/null
+              for EX in netdump netfilter passthru webfilter windivertctl; do
+                $CC -s -O2 -Iinclude/ examples/$EX/$EX.c -o "install/MINGW/$CPU/$EX.exe" -lWinDivert -L"install/MINGW/$CPU/"
+              done
+              $CC -s -O2 -Iinclude/ examples/streamdump/streamdump.c -o "install/MINGW/$CPU/streamdump.exe" -lWinDivert -lws2_32 -L"install/MINGW/$CPU/"
+              $CC -s -O2 -Iinclude/ examples/flowtrack/flowtrack.c -o "install/MINGW/$CPU/flowtrack.exe" -lWinDivert -lpsapi -lshlwapi -L"install/MINGW/$CPU/"
+              $CC -s -O2 -Iinclude/ examples/socketdump/socketdump.c -o "install/MINGW/$CPU/socketdump.exe" -lWinDivert -lpsapi -lshlwapi -L"install/MINGW/$CPU/"
+              $CC -s -O2 -Iinclude/ test/test.c -o "install/MINGW/$CPU/test.exe" -lWinDivert -L"install/MINGW/$CPU/"
+            else
+              echo "WARNING: $CC not found"
+            fi
+          done
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
