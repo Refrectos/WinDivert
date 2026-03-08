@@ -9,7 +9,7 @@ jobs:
       - name: Install MSYS2
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: MSYS
           update: true
           install: >-
             mingw-w64-x86_64-gcc
@@ -17,14 +17,12 @@ jobs:
             mingw-w64-x86_64-binutils
             mingw-w64-i686-binutils
 
-      - name: Install i686 tools
-        shell: msys2 {0}
-        run: pacman -S --noconfirm mingw-w64-i686-binutils mingw-w64-i686-gcc
-
       - name: Build
         shell: msys2 {0}
         run: |
           export PATH="/mingw32/bin:/mingw64/bin:$PATH"
+          which i686-w64-mingw32-strip || echo "strip not found"
+          which i686-w64-mingw32-gcc || echo "gcc not found"
           ENVS="i686-w64-mingw32 x86_64-w64-mingw32"
           for ENV in $ENVS
           do
@@ -36,11 +34,11 @@ jobs:
             DLLTOOL="$ENV-dlltool"
             COPTS="-fno-ident -shared -Wall -Wno-pointer-to-int-cast -Os -Iinclude/ -Wl,--enable-stdcall-fixup -Wl,--entry=${MANGLE}WinDivertDllEntry"
             CLIBS="-lkernel32 -ladvapi32 -lmsvcrt -lgcc"
-            if [ -x "$(which $CC)" ]; then
+            if [ -x "$(which $CC 2>/dev/null)" ]; then
               mkdir -p "install/MINGW/$CPU"
               $CC $COPTS -c dll/windivert.c -o dll/windivert.o
               $CC $COPTS -o "install/MINGW/$CPU/WinDivert.dll" dll/windivert.o dll/windivert.def -nostdlib $CLIBS
-              $STRIP "install/MINGW/$CPU/WinDivert.dll"
+              $STRIP "install/MINGW/$CPU/WinDivert.dll" || true
               $DLLTOOL --dllname install/MINGW/$CPU/WinDivert.dll --def dll/windivert.def --output-lib install/MINGW/$CPU/WinDivert.lib 2>/dev/null
               for EX in netdump netfilter passthru webfilter windivertctl; do
                 $CC -s -O2 -Iinclude/ examples/$EX/$EX.c -o "install/MINGW/$CPU/$EX.exe" -lWinDivert -L"install/MINGW/$CPU/"
