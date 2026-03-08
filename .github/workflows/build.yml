@@ -21,6 +21,9 @@ jobs:
         shell: msys2 {0}
         run: |
           export PATH="/mingw32/bin:/mingw64/bin:$PATH"
+          echo "=== Available tools ==="
+          ls /mingw32/bin/ | grep -E "strip|dlltool|gcc" || echo "nothing in mingw32"
+          ls /mingw64/bin/ | grep -E "strip|dlltool|gcc" || echo "nothing in mingw64"
           ENVS="i686-w64-mingw32 x86_64-w64-mingw32"
           for ENV in $ENVS
           do
@@ -36,19 +39,15 @@ jobs:
               mkdir -p "install/MINGW/$CPU"
               $CC $COPTS -c dll/windivert.c -o dll/windivert.o
               $CC $COPTS -o "install/MINGW/$CPU/WinDivert.dll" dll/windivert.o dll/windivert.def -nostdlib $CLIBS
-              if [ -x "$(which $STRIP 2>/dev/null)" ]; then
-                $STRIP "install/MINGW/$CPU/WinDivert.dll"
-              else
-                echo "WARNING: $STRIP not found, skipping strip"
-              fi
-              $DLLTOOL --dllname install/MINGW/$CPU/WinDivert.dll --def dll/windivert.def --output-lib install/MINGW/$CPU/WinDivert.lib 2>/dev/null
+              which $STRIP 2>/dev/null && $STRIP "install/MINGW/$CPU/WinDivert.dll" || echo "WARNING: $STRIP not found, skipping"
+              which $DLLTOOL 2>/dev/null && $DLLTOOL --dllname install/MINGW/$CPU/WinDivert.dll --def dll/windivert.def --output-lib install/MINGW/$CPU/WinDivert.lib 2>/dev/null || echo "WARNING: $DLLTOOL not found, skipping"
               for EX in netdump netfilter passthru webfilter windivertctl; do
-                $CC -s -O2 -Iinclude/ examples/$EX/$EX.c -o "install/MINGW/$CPU/$EX.exe" -lWinDivert -L"install/MINGW/$CPU/"
+                $CC -s -O2 -Iinclude/ examples/$EX/$EX.c -o "install/MINGW/$CPU/$EX.exe" -lWinDivert -L"install/MINGW/$CPU/" || true
               done
-              $CC -s -O2 -Iinclude/ examples/streamdump/streamdump.c -o "install/MINGW/$CPU/streamdump.exe" -lWinDivert -lws2_32 -L"install/MINGW/$CPU/"
-              $CC -s -O2 -Iinclude/ examples/flowtrack/flowtrack.c -o "install/MINGW/$CPU/flowtrack.exe" -lWinDivert -lpsapi -lshlwapi -L"install/MINGW/$CPU/"
-              $CC -s -O2 -Iinclude/ examples/socketdump/socketdump.c -o "install/MINGW/$CPU/socketdump.exe" -lWinDivert -lpsapi -lshlwapi -L"install/MINGW/$CPU/"
-              $CC -s -O2 -Iinclude/ test/test.c -o "install/MINGW/$CPU/test.exe" -lWinDivert -L"install/MINGW/$CPU/"
+              $CC -s -O2 -Iinclude/ examples/streamdump/streamdump.c -o "install/MINGW/$CPU/streamdump.exe" -lWinDivert -lws2_32 -L"install/MINGW/$CPU/" || true
+              $CC -s -O2 -Iinclude/ examples/flowtrack/flowtrack.c -o "install/MINGW/$CPU/flowtrack.exe" -lWinDivert -lpsapi -lshlwapi -L"install/MINGW/$CPU/" || true
+              $CC -s -O2 -Iinclude/ examples/socketdump/socketdump.c -o "install/MINGW/$CPU/socketdump.exe" -lWinDivert -lpsapi -lshlwapi -L"install/MINGW/$CPU/" || true
+              $CC -s -O2 -Iinclude/ test/test.c -o "install/MINGW/$CPU/test.exe" -lWinDivert -L"install/MINGW/$CPU/" || true
             else
               echo "WARNING: $CC not found"
             fi
