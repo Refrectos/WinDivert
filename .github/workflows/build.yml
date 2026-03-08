@@ -17,11 +17,22 @@ jobs:
             mingw-w64-x86_64-binutils
             mingw-w64-i686-binutils
 
+      - name: Patch build script
+        shell: msys2 {0}
+        run: |
+          python3 -c "
+          content = open('mingw-build.sh').read()
+          content = content.replace(
+            'CLIBS=\"-lkernel32 -ladvapi32 \$EXTRA_OPTS\"',
+            'CLIBS=\"-lkernel32 -ladvapi32 -lmsvcrt \$EXTRA_OPTS\"'
+          )
+          open('mingw-build.sh', 'w').write(content)
+          "
+
       - name: Build
         shell: msys2 {0}
         run: |
           export PATH="/mingw32/bin:/mingw64/bin:$PATH"
-          sed -i 's/-nostdlib $CLIBS/-nostdlib $CLIBS -lmsvcrt/' mingw-build.sh
           bash mingw-build.sh
 
       - name: Upload artifacts
