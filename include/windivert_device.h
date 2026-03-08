@@ -161,7 +161,7 @@
 #define WINDIVERT_FILTER_TEST_GEQ                   5
 #define WINDIVERT_FILTER_TEST_MAX                   WINDIVERT_FILTER_TEST_GEQ
 
-#define WINDIVERT_FILTER_MAXLEN                     256
+#define WINDIVERT_FILTER_MAXLEN                     1024
 
 #define WINDIVERT_FILTER_RESULT_ACCEPT              0x7FFE
 #define WINDIVERT_FILTER_RESULT_REJECT              0x7FFF
