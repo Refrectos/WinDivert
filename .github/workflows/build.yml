@@ -17,23 +17,12 @@ jobs:
             mingw-w64-x86_64-binutils
             mingw-w64-i686-binutils
 
-      - name: Patch build script
-        shell: msys2 {0}
-        run: |
-          python3 -c "
-          content = open('mingw-build.sh').read()
-          content = content.replace(
-            'CLIBS=\"-lkernel32 -ladvapi32 \$EXTRA_OPTS\"',
-            'CLIBS=\"-lkernel32 -ladvapi32 -lmsvcrt \$EXTRA_OPTS\"'
-          )
-          open('mingw-build.sh', 'w').write(content)
-          "
-
       - name: Build
         shell: msys2 {0}
         run: |
           export PATH="/mingw32/bin:/mingw64/bin:$PATH"
-          bash mingw-build.sh
+          awk '{gsub(/CLIBS="-lkernel32 -ladvapi32 \$EXTRA_OPTS"/, "CLIBS=\"-lkernel32 -ladvapi32 -lmsvcrt \$EXTRA_OPTS\"")}1' mingw-build.sh > mingw-build-patched.sh
+          bash mingw-build-patched.sh
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
