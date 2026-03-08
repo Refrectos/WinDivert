@@ -14,10 +14,12 @@ jobs:
           install: >-
             mingw-w64-x86_64-gcc
             mingw-w64-i686-gcc
+            mingw-w64-x86_64-binutils
+            mingw-w64-i686-binutils
 
       - name: Build
         shell: msys2 {0}
-        run: bash mingw-build.sh
+        run: bash mingw-build.sh debug
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
