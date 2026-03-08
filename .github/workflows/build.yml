@@ -21,8 +21,6 @@ jobs:
         shell: msys2 {0}
         run: |
           export PATH="/mingw32/bin:/mingw64/bin:$PATH"
-          which i686-w64-mingw32-strip || echo "strip not found"
-          which i686-w64-mingw32-gcc || echo "gcc not found"
           ENVS="i686-w64-mingw32 x86_64-w64-mingw32"
           for ENV in $ENVS
           do
@@ -38,7 +36,11 @@ jobs:
               mkdir -p "install/MINGW/$CPU"
               $CC $COPTS -c dll/windivert.c -o dll/windivert.o
               $CC $COPTS -o "install/MINGW/$CPU/WinDivert.dll" dll/windivert.o dll/windivert.def -nostdlib $CLIBS
-              $STRIP "install/MINGW/$CPU/WinDivert.dll" || true
+              if [ -x "$(which $STRIP 2>/dev/null)" ]; then
+                $STRIP "install/MINGW/$CPU/WinDivert.dll"
+              else
+                echo "WARNING: $STRIP not found, skipping strip"
+              fi
               $DLLTOOL --dllname install/MINGW/$CPU/WinDivert.dll --def dll/windivert.def --output-lib install/MINGW/$CPU/WinDivert.lib 2>/dev/null
               for EX in netdump netfilter passthru webfilter windivertctl; do
                 $CC -s -O2 -Iinclude/ examples/$EX/$EX.c -o "install/MINGW/$CPU/$EX.exe" -lWinDivert -L"install/MINGW/$CPU/"
