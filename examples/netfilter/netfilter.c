@@ -5,8 +5,8 @@
  * This file is part of WinDivert.
  *
  * PATCHED: UDP packets are silently dropped (no ICMP responses).
- * All blocked packets are logged to a file specified via -l flag.
- * fflush is called at most once per 200ms to avoid performance issues.
+ * fflush called at most once per 200ms for performance under high PPS.
+ * Queue size set to maximum: 16384 packets, 32MB, 16000ms timeout.
  *
  * usage: netfilter.exe windivert-filter [-v] [-l logfile]
  */
@@ -129,6 +129,10 @@ int __cdecl main(int argc, char **argv)
             GetLastError());
         exit(EXIT_FAILURE);
     }
+
+    WinDivertSetParam(handle, WINDIVERT_PARAM_QUEUE_LENGTH, 16384);
+    WinDivertSetParam(handle, WINDIVERT_PARAM_QUEUE_TIME,   16000);
+    WinDivertSetParam(handle, WINDIVERT_PARAM_QUEUE_SIZE,   33554432);
 
     while (TRUE)
     {
