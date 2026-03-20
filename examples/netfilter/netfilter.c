@@ -5,7 +5,8 @@
  * This file is part of WinDivert.
  *
  * PATCHED: UDP packets are silently dropped (no ICMP responses).
- *          All blocked packets are logged to a file specified via -l flag.
+ * All blocked packets are logged to a file specified via -l flag.
+ * fflush is called at most once per 200ms to avoid performance issues.
  *
  * usage: netfilter.exe windivert-filter [-v] [-l logfile]
  */
@@ -78,13 +79,14 @@ int __cdecl main(int argc, char **argv)
     const char *err_str;
     int verbose = 0;
     FILE *logfile = NULL;
+    DWORD last_flush = 0;
 
     TCPPACKET reset0;
     PTCPPACKET reset = &reset0;
+
     TCPV6PACKET resetv6_0;
     PTCPV6PACKET resetv6 = &resetv6_0;
 
-    // Parse arguments: filter [-v] [-l logfile]
     if (argc < 2)
     {
         fprintf(stderr, "usage: %s windivert-filter [-v] [-l logfile]\n", argv[0]);
@@ -103,10 +105,10 @@ int __cdecl main(int argc, char **argv)
         }
     }
 
-    // Initialize TCP reset packets only (no ICMP needed for UDP)
     PacketIpTcpInit(reset);
     reset->tcp.Rst = 1;
     reset->tcp.Ack = 1;
+
     PacketIpv6TcpInit(resetv6);
     resetv6->tcp.Rst = 1;
     resetv6->tcp.Ack = 1;
@@ -143,7 +145,6 @@ int __cdecl main(int argc, char **argv)
         if (ip_header == NULL && ipv6_header == NULL)
             continue;
 
-        // Format addresses
         if (ip_header != NULL)
         {
             WinDivertHelperFormatIPv4Address(ntohl(ip_header->SrcAddr), src_str, sizeof(src_str));
@@ -157,13 +158,11 @@ int __cdecl main(int argc, char **argv)
             WinDivertHelperFormatIPv6Address(dst_addr, dst_str, sizeof(dst_str));
         }
 
-        // ── UDP: silent drop, no ICMP response ──────────────────────────
         if (udp_header != NULL)
         {
             UINT16 sport = ntohs(udp_header->SrcPort);
             UINT16 dport = ntohs(udp_header->DstPort);
 
-            // Console output (only if -v flag)
             if (verbose)
             {
                 SetConsoleTextAttribute(console, FOREGROUND_RED);
@@ -174,19 +173,22 @@ int __cdecl main(int argc, char **argv)
                     src_str, dst_str, sport, dport);
             }
 
-            // Log to file
             if (logfile)
             {
                 fprintf(logfile, "ip.SrcAddr=%s ip.DstAddr=%s SrcPort=%u DstPort=%u\n",
                     src_str, dst_str, sport, dport);
-                fflush(logfile);
+
+                DWORD now = GetTickCount();
+                if (now - last_flush >= 200)
+                {
+                    fflush(logfile);
+                    last_flush = now;
+                }
             }
 
-            // Packet is simply dropped — no WinDivertSend, no ICMP
             continue;
         }
 
-        // ── TCP: send RST (original behaviour) ──────────────────────────
         if (tcp_header != NULL)
         {
             if (verbose)
@@ -210,6 +212,7 @@ int __cdecl main(int argc, char **argv)
                 reset->tcp.AckNum = (tcp_header->Syn ?
                     htonl(ntohl(tcp_header->SeqNum) + 1) :
                     htonl(ntohl(tcp_header->SeqNum) + payload_len));
+
                 memcpy(&send_addr, &recv_addr, sizeof(send_addr));
                 send_addr.Outbound = !recv_addr.Outbound;
                 WinDivertHelperCalcChecksums((PVOID)reset, sizeof(TCPPACKET), &send_addr, 0);
@@ -226,15 +229,17 @@ int __cdecl main(int argc, char **argv)
                 resetv6->tcp.AckNum = (tcp_header->Syn ?
                     htonl(ntohl(tcp_header->SeqNum) + 1) :
                     htonl(ntohl(tcp_header->SeqNum) + payload_len));
+
                 memcpy(&send_addr, &recv_addr, sizeof(send_addr));
                 send_addr.Outbound = !recv_addr.Outbound;
                 WinDivertHelperCalcChecksums((PVOID)resetv6, sizeof(TCPV6PACKET), &send_addr, 0);
                 WinDivertSend(handle, (PVOID)resetv6, sizeof(TCPV6PACKET), NULL, &send_addr);
             }
+
             continue;
         }
 
-        // ── ICMP: silent drop (original behaviour) ───────────────────────
+        // ICMP: silent drop
     }
 
     if (logfile) fclose(logfile);
